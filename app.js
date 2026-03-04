@@ -1,5 +1,5 @@
 // app.js corregido para conectar con Flask (Python) en VS Code
-const URL_API = "http://localhost:5000/Servlet"; // Cambiamos 8080 por 5000
+const URL_API = "https://surfflow1.onrender.com/Servlet";
 
 async function obtenerDatos() {
     try {
@@ -42,3 +42,4 @@ function gestionar(id) {
     window.location.href = `gestion_individual.html?id=${id}`;
 }
 document.addEventListener("DOMContentLoaded", obtenerDatos);
+
