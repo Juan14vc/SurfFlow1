@@ -1,4 +1,4 @@
-const URL_API = "http://localhost:5000/Servlet";
+const URL_API = "https://surfflow1.onrender.com/Servlet";
 
 async function cargarTablas() {
     try {
@@ -43,5 +43,6 @@ async function manejarCambio(id, nuevoEstado) {
         }
     }
 }
+
 
 document.addEventListener("DOMContentLoaded", cargarTablas);
