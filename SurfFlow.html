@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SurfFlow - Inventario Natali</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <script>
+        if (localStorage.getItem('usuario_logeado') !== 'true') {
+            window.location.href = "login.html";
+        }
+    </script>
+</head>
+<body>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>🏄‍♂️ SurfFlow - Gestión Barranco</h1>
+            <button onclick="cerrarSesion()" style="padding: 8px 15px; background: #e63946; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                Cerrar Sesión 🚪
+            </button>
+        </div>
+        
+        <p>Hola, <strong id="nombre-admin">Admin</strong>. Gestiona tus tablas y ventas hoy.</p>
+        <hr>
+
+        <div style="background: #f1f9ff; padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid #caf0f8;">
+            <h3>➕ Agregar Nueva Tabla al Stock</h3>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <input type="text" id="new-nombre" placeholder="Nombre (Ej: Funboard Roja)" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc; flex: 1;">
+                <input type="text" id="new-medida" placeholder="Medida (Ej: 7'2)" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100px;">
+                <select id="new-tipo" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                    <option value="Softboard">Softboard</option>
+                    <option value="Fibra">Fibra</option>
+                    <option value="Longboard">Longboard</option>
+                </select>
+                <button onclick="agregarTabla()" style="padding: 10px 20px; background: #2a9d8f; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    Guardar Tabla
+                </button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="location.href='movimientos.html'" style="padding: 12px 20px; background: #0077b6; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold;">
+                📊 Ver Reporte de Ventas
+            </button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre de Tabla</th>
+                        <th>Medida</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-tablas">
+                    <tr><td colspan="6">Cargando datos desde la playa...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    
+    <script>
+        // Mostrar nombre de Natali
+        document.getElementById('nombre-admin').innerText = localStorage.getItem('nombre_admin') || 'Admin';
+
+        function cerrarSesion() {
+            localStorage.clear(); // Borra la "llave"
+            window.location.href = "login.html";
+        }
+
+        // Esta función la conectaremos luego con tu app.js para el INSERT
+        async function agregarTabla() {
+            const nombre = document.getElementById('new-nombre').value;
+            const medida = document.getElementById('new-medida').value;
+            const tipo = document.getElementById('new-tipo').value;
+
+            if(!nombre || !medida) return alert("Completa los datos de la tabla");
+
+            // Aquí llamaremos a tu API de Python
+            const url = `http://localhost:5000/Servlet?accion=agregar_tabla&nombre=${nombre}&medida=${medida}&tipo=${tipo}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if(data.status === 'success') {
+                alert("¡Tabla agregada!");
+                location.reload(); // Recarga para ver la nueva tabla
+            }
+        }
+    </script>
+</body>
+</html>

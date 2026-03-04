@@ -1,0 +1,121 @@
+/* --- Estilos para la página de Reserva --- */
+
+:root {
+    --azul-mar: #0077b6;
+    --celeste-surf: #e0f2fe;
+    --blanco: #ffffff;
+    --gris-suave: #f8f9fa;
+    --rojo-alerta: #e63946;
+}
+
+/* Contenedor del Formulario */
+.card {
+    background: var(--blanco);
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    max-width: 450px;
+    margin: 20px auto;
+}
+
+h1 {
+    text-align: center;
+    color: var(--azul-mar);
+    font-family: 'Arial', sans-serif;
+}
+
+.auto-info {
+    text-align: center;
+    background: #fff3cd;
+    color: #856404;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.9em;
+    margin-bottom: 20px;
+}
+
+/* Inputs y Labels */
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #333;
+    font-size: 0.95em;
+}
+
+input[type="text"],
+input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-sizing: border-box; /* Evita que el input se salga del card */
+    font-size: 1em;
+}
+
+/* Grupo de Botones Radio (SÍ/NO) */
+.radio-group {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.radio-option {
+    flex: 1;
+}
+
+.radio-option input {
+    display: none; /* Escondemos el circulo feo por defecto */
+}
+
+.radio-option label {
+    display: block;
+    background: var(--gris-suave);
+    padding: 15px;
+    text-align: center;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 2px solid #eee;
+    transition: all 0.3s ease;
+    margin-bottom: 0; /* Reseteamos el margin del label general */
+}
+
+/* Efecto cuando se selecciona SÍ o NO */
+.radio-option input:checked + label {
+    background: var(--celeste-surf);
+    border-color: var(--azul-mar);
+    color: var(--azul-mar);
+    transform: scale(1.05);
+}
+
+/* Botón Principal */
+.btn-uso {
+    background-color: var(--azul-mar);
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.3s;
+}
+
+.btn-uso:hover {
+    background-color: #005f92;
+}
+
+/* Enlace de volver */
+nav a {
+    text-decoration: none;
+    color: var(--azul-mar);
+    font-weight: bold;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
