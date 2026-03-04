@@ -1,5 +1,5 @@
 // reserva.js corregido
-const urlParams = new URLSearchParams(window.location.search);
+const URL_API = "https://surfflow1.onrender.com/Servlet";
 const idActual = urlParams.get('id');
 document.getElementById('id-txt').innerText = idActual || "Error";
 
@@ -36,4 +36,5 @@ document.getElementById('reservaForm').addEventListener('submit', async (e) => {
         alert("❌ Error: El servidor Python no está respondiendo.");
         btn.disabled = false;
     }
+
 });
