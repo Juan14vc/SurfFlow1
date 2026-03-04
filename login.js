@@ -1,6 +1,5 @@
 // URL de tu API (Asegúrate de que coincida con tu puerto o ngrok)
-const URL_API = "http://localhost:5000/Servlet";
-
+const URL_API = "https://surfflow1.onrender.com/Servlet";
 async function intentarLogin() {
     const user = document.getElementById('txt-usuario').value;
     const pass = document.getElementById('txt-password').value;
@@ -32,4 +31,5 @@ async function intentarLogin() {
         console.error("Error:", error);
         alert("Parece que el servidor está apagado. ¡Prende el Python!");
     }
+
 }
