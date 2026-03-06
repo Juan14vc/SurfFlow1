@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registrar Alquiler</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="card" style="max-width:400px; margin: 50px auto; padding: 20px; background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+        <h2>📝 Datos del Cliente</h2>
+        <p>Registrando Tabla #<span id="id-txt">...</span></p>
+        <form id="reservaForm">
+            <input type="text" id="cliente" placeholder="Nombre del Cliente" required style="width:100%; margin-bottom:10px; padding:10px;">
+            <input type="number" id="monto" placeholder="Monto S/" required style="width:100%; margin-bottom:10px; padding:10px;">
+            <input type="text" id="ref" placeholder="Referencia Yape/Plin" required style="width:100%; margin-bottom:15px; padding:10px;">
+            <button type="submit" id="btn" style="width:100%; padding:15px; background:#0077b6; color:white; border:none; border-radius:10px; cursor:pointer;">GUARDAR Y FINALIZAR</button>
+        </form>
+        <br><a href="SurfFlow.html">Cancelar y volver</a>
+    </div>
+    <script src="reserva.js"></script>
+</body>
+</html>

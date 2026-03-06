@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SurfFlow - Modificar Estado</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; background: #f0faff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
+        .btn-status { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; font-size: 1rem; }
+        
+        .btn-uso { background: #ffca28; color: #5f4b00; } /* Amarillo */
+        .btn-liberar { background: #66bb6a; color: white; } /* Verde */
+        .btn-mant { background: #ef5350; color: white; } /* Rojo */
+        
+        .btn-status:hover { transform: scale(1.02); opacity: 0.9; }
+        .id-badge { background: #0077b6; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <a href="SurfFlow.html" style="text-decoration:none; color:#0077b6; font-size:0.8rem;">← Volver al Dashboard</a>
+    <h2>Gestionar Tabla <span id="id-display" class="id-badge">...</span></h2>
+    <p>Selecciona el nuevo estado:</p>
+
+    <button class="btn-status btn-uso" onclick="enviarEstado('En Uso')">Marcar: EN USO 🟡</button>
+    <button class="btn-status btn-liberar" onclick="enviarEstado('Disponible')">Marcar: LIBERAR (Disponible) 🟢</button>
+    <button class="btn-status btn-mant" onclick="enviarEstado('Mantenimiento')">Marcar: MANTENIMIENTO 🔴</button>
+</div>
+
+<script>
+    // 1. Capturar el ID de la URL
+    const params = new URLSearchParams(window.location.search);
+    const idTabla = params.get('id');
+    document.getElementById('id-display').innerText = `#${idTabla}`;
+
+    // 2. Función para avisar a Python
+    async function enviarEstado(nuevoEstado) {
+        if(!idTabla) return alert("ID no encontrado");
+
+        const url = `http://localhost:5000/Servlet?accion=actualizar_estado&id=${idTabla}&estado=${encodeURIComponent(nuevoEstado)}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (data.status === "ok") {
+                // --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
+                if (nuevoEstado === 'En Uso') {
+                    // Si Natali marca En Uso, la mandamos directo a llenar los datos del cliente
+                    window.location.href = `reserva.html?id=${idTabla}`;
+                } else {
+                    // Si libera la tabla o la manda a mantenimiento, regresa al dashboard
+                    alert(`✅ Tabla #${idTabla} actualizada a: ${nuevoEstado}`);
+                    window.location.href = "SurfFlow.html";
+                }
+            } else {
+                alert("❌ Error al actualizar en SQL.");
+            }
+        } catch (err) {
+            alert("❌ El servidor Python no responde. ¿Está corriendo app.py?");
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SurfFlow - Análisis de Movimientos</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .resumen { display: flex; gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 15px; flex: 1; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
+        .monto-total { font-size: 2rem; color: #2e7d32; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="SurfFlow.html" style="text-decoration:none;">← Volver al Dashboard</a>
+        <h1>📊 Análisis de Movimientos</h1>
+        
+        <div class="resumen">
+            <div class="stat-card">
+                <p>Ingresos Totales</p>
+                <div class="monto-total" id="total-caja">S/ 0.00</div>
+            </div>
+            <div class="stat-card">
+                <p>Alquileres Realizados</p>
+                <div class="monto-total" id="total-conteo" style="color:#0077b6">0</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tabla</th>
+                    <th>Cliente</th>
+                    <th>Ref (Yape)</th>
+                    <th>Monto</th>
+                </tr>
+            </thead>
+            <tbody id="lista-movimientos"></tbody>
+        </table>
+    </div>
+
+    <script>
+        async function cargarMovimientos() {
+            const res = await fetch('http://localhost:5000/Servlet?accion=listar_movimientos');
+            const datos = await res.json();
+            
+            let total = 0;
+            const tbody = document.getElementById('lista-movimientos');
+            tbody.innerHTML = datos.map(m => {
+                total += m.monto;
+                return `
+                    <tr>
+                        <td>${m.fecha}</td>
+                        <td>${m.tabla}</td>
+                        <td>${m.cliente}</td>
+                        <td><small>${m.ref}</small></td>
+                        <td><strong>S/ ${m.monto.toFixed(2)}</strong></td>
+                    </tr>`;
+            }).join('');
+
+            document.getElementById('total-caja').innerText = `S/ ${total.toFixed(2)}`;
+            document.getElementById('total-conteo').innerText = datos.length;
+        }
+        document.addEventListener('DOMContentLoaded', cargarMovimientos);
+    </script>
+</body>
+</html>
