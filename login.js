@@ -11,7 +11,7 @@ async function intentarLogin() {
     }
 
     try {
-        const url = `${URL_API}?accion=login&user=${user}&pwd=${pass}`;
+        const URL_API = "https://surfflow1.onrender.com/Servlet";
         const response = await fetch(url);
         const data = await response.json();
 
@@ -33,3 +33,4 @@ async function intentarLogin() {
     }
 
 }
+
