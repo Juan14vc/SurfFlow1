@@ -1,21 +1,28 @@
-const URL_API = "https://surfflow1.onrender.com/Servlet";
-
 async function intentarLogin() {
     const user = document.getElementById('txt-usuario').value;
     const pass = document.getElementById('txt-password').value;
 
+    if (!user || !pass) {
+        alert("¡Ingresa tus datos! 🏄‍♂️");
+        return;
+    }
+
     try {
-        // Importante: No borres el ?accion= si tu código lo usa, pero aquí lo simplifiqué
-        const response = await fetch(`${URL_API}?user=${user}&pwd=${pass}`);
+        // AGREGAMOS: ?accion=login para que Python sepa que es un inicio de sesión
+        const response = await fetch(`${URL_API}?accion=login&user=${user}&pwd=${pass}`);
         const data = await response.json();
 
         if (data.status === "success") {
-            localStorage.setItem('admin_name', data.usuario.nombre);
+            // Guardamos el nombre para mostrarlo en el Dashboard
+            localStorage.setItem('nombre_admin', data.usuario.nombre);
+            // IMPORTANTE: Esta es la "llave" para que SurfFlow.html te deje entrar
+            localStorage.setItem('usuario_logeado', 'true'); 
+            
             window.location.href = "SurfFlow.html"; 
         } else {
-            alert("Usuario o clave incorrectos");
+            alert("Credenciales incorrectas.");
         }
     } catch (error) {
-        alert("El servidor está cargando... espera 30 segundos y reintenta.");
+        alert("El servidor está despertando... espera 30 segundos y reintenta.");
     }
 }
