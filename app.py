@@ -1,70 +1,147 @@
-import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from database import get_connection
+import os
 
 app = Flask(__name__)
-CORS(app)
+# Permitimos CORS para que tu GitHub Pages pueda conectarse sin bloqueos
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-def setup_db():
+def inicializar_sistema():
+    """Función para crear tablas y usuario inicial automáticamente"""
     conn = get_connection()
-    cur = conn.cursor()
+    cursor = conn.cursor()
     try:
-        # Crea tablas
-        cur.execute("CREATE TABLE IF NOT EXISTS Usuarios (id SERIAL PRIMARY KEY, nombre_completo TEXT, usuario TEXT UNIQUE, password TEXT, rol TEXT)")
-        cur.execute("CREATE TABLE IF NOT EXISTS Tablas (id SERIAL PRIMARY KEY, nombre TEXT, medida TEXT, tipo TEXT, estado TEXT DEFAULT 'Disponible')")
-        
-        # Inserta a Natali (Admin)
-        cur.execute("INSERT INTO Usuarios (nombre_completo, usuario, password, rol) VALUES ('Natali', 'natali_surf', 'surf2026', 'admin') ON CONFLICT (usuario) DO NOTHING")
+        # 1. Crear tabla de Usuarios si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Usuarios (
+                id SERIAL PRIMARY KEY,
+                nombre_completo VARCHAR(100),
+                usuario VARCHAR(50) UNIQUE,
+                password VARCHAR(50),
+                rol VARCHAR(20)
+            );
+        """)
+
+        # 2. Crear tabla de Tablas (Inventario) si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Tablas (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(100),
+                medida VARCHAR(20),
+                tipo VARCHAR(50),
+                estado VARCHAR(20) DEFAULT 'Disponible'
+            );
+        """)
+
+        # 3. Crear tabla de Reservas si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Reservas (
+                id SERIAL PRIMARY KEY,
+                cliente_nombre VARCHAR(100),
+                monto_pago DECIMAL(10,2),
+                comprobante_img TEXT,
+                confirmado BOOLEAN,
+                fecha_reserva TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                tabla_id INTEGER REFERENCES Tablas(id)
+            );
+        """)
+
+        # 4. Insertar a Natali (Admin) si no existe
+        cursor.execute("""
+            INSERT INTO Usuarios (nombre_completo, usuario, password, rol)
+            VALUES ('Natali', 'natali_surf', 'surf2026', 'admin')
+            ON CONFLICT (usuario) DO NOTHING;
+        """)
+
+        # 5. Insertar un par de tablas de prueba si el inventario está vacío
+        cursor.execute("SELECT COUNT(*) FROM Tablas")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO Tablas (nombre, medida, tipo, estado) VALUES 
+                ('Blue Wave', '7.0', 'Funboard', 'Disponible'),
+                ('Red Shark', '6.0', 'Shortboard', 'Disponible'),
+                ('Yellow Sun', '8.2', 'Longboard', 'Disponible');
+            """)
+
         conn.commit()
+        print("✅ Base de datos sincronizada correctamente.")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error al inicializar: {e}")
     finally:
-        cur.close()
+        cursor.close()
         conn.close()
 
-setup_db()
+# Ejecutar la inicialización al arrancar el servidor
+inicializar_sistema()
 
 @app.route('/Servlet', methods=['GET'])
 def gateway():
-    accion = request.args.get('accion') # Aquí leemos qué quiere hacer el JS
+    accion = request.args.get('accion')
     conn = get_connection()
-    cur = conn.cursor()
+    cursor = conn.cursor()
     
     try:
-        # --- CASO 1: LOGIN ---
+        # --- LOGIN ---
         if accion == 'login':
-            u = request.args.get('user')
-            p = request.args.get('pwd')
-            cur.execute("SELECT nombre_completo FROM Usuarios WHERE usuario = %s AND password = %s", (u, p))
-            user = cur.fetchone()
-            if user:
-                return jsonify({"status": "success", "usuario": {"nombre": user[0]}})
-            return jsonify({"status": "error", "message": "Credenciales incorrectas"})
+            user = request.args.get('user')
+            pwd = request.args.get('pwd')
+            cursor.execute("SELECT id, nombre_completo FROM Usuarios WHERE usuario = %s AND password = %s", (user, pwd))
+            row = cursor.fetchone()
+            if row:
+                return jsonify({"status": "success", "usuario": {"id": row[0], "nombre": row[1]}})
+            return jsonify({"status": "error", "message": "Credenciales inválidas"})
 
-        # --- CASO 2: LISTAR TABLAS ---
-        elif accion == 'listar':
-            cur.execute("SELECT id, nombre, medida, tipo, estado FROM Tablas ORDER BY id ASC")
-            tablas = [{"id": r[0], "nombre": r[1], "medida": r[2], "tipo": r[3], "estado": r[4]} for r in cur.fetchall()]
+        # --- LISTAR INVENTARIO ---
+        if accion == 'listar':
+            cursor.execute("SELECT id, nombre, medida, tipo, estado FROM Tablas ORDER BY id ASC")
+            tablas = [{"id": r[0], "nombre": r[1], "medida": r[2], "tipo": r[3], "estado": r[4]} for r in cursor.fetchall()]
             return jsonify(tablas)
 
-        # --- CASO 3: AGREGAR TABLA ---
-        elif accion == 'agregar_tabla':
-            n = request.args.get('nombre')
-            m = request.args.get('medida')
-            t = request.args.get('tipo')
-            cur.execute("INSERT INTO Tablas (nombre, medida, tipo) VALUES (%s, %s, %s)", (n, m, t))
-            conn.commit()
-            return jsonify({"status": "success"})
+       # --- REGISTRAR RESERVA (ALQUILER) ---
+        if accion == 'insertar_reserva':
+            # Capturamos los datos del JS
+            tabla_id = request.args.get('tabla_id')
+            cliente = request.args.get('cliente')
+            monto = request.args.get('monto')
+            referencia = request.args.get('comprobante') # Aquí llega el Yape/Plin
 
-        return jsonify({"status": "error", "message": "Acción no reconocida"})
+            sql = """INSERT INTO Reservas (cliente_nombre, monto_pago, comprobante_img, confirmado, tabla_id) 
+                     VALUES (%s, %s, %s, %s, %s)"""
+            cursor.execute(sql, (cliente, monto, referencia, True, tabla_id))
+            
+            # Cambiamos el estado de la tabla automáticamente
+            cursor.execute("UPDATE Tablas SET estado = 'En Uso' WHERE id = %s", (tabla_id,))
+            
+            conn.commit()
+            return jsonify({"status": "ok"})
+
+        # --- LISTAR MOVIMIENTOS (REPORTE) ---
+        if accion == 'listar_movimientos':
+            sql = """SELECT R.fecha_reserva, T.nombre, R.cliente_nombre, R.comprobante_img, R.monto_pago
+                     FROM Reservas R 
+                     INNER JOIN Tablas T ON R.tabla_id = T.id 
+                     ORDER BY R.fecha_reserva DESC"""
+            cursor.execute(sql)
+            # El campo R.comprobante_img ahora actúa como 'ref'
+            movs = [{
+                "fecha": r[0].strftime("%d/%m %H:%M"),
+                "tabla": r[1],
+                "cliente": r[2],
+                "ref": r[3], 
+                "monto": float(r[4])
+            } for r in cursor.fetchall()]
+            return jsonify(movs)
+        
+        
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
     finally:
-        cur.close()
+        cursor.close()
         conn.close()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
-
+    # Render usa la variable de entorno PORT
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
