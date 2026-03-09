@@ -26,20 +26,45 @@ def setup_db():
 setup_db()
 
 @app.route('/Servlet', methods=['GET'])
-def login():
-    u = request.args.get('user')
-    p = request.args.get('pwd')
+def gateway():
+    accion = request.args.get('accion') # Aquí leemos qué quiere hacer el JS
     conn = get_connection()
     cur = conn.cursor()
+    
     try:
-        cur.execute("SELECT nombre_completo FROM Usuarios WHERE usuario = %s AND password = %s", (u, p))
-        user = cur.fetchone()
-        if user:
-            return jsonify({"status": "success", "usuario": {"nombre": user[0]}})
-        return jsonify({"status": "error", "message": "No encontrado"})
+        # --- CASO 1: LOGIN ---
+        if accion == 'login':
+            u = request.args.get('user')
+            p = request.args.get('pwd')
+            cur.execute("SELECT nombre_completo FROM Usuarios WHERE usuario = %s AND password = %s", (u, p))
+            user = cur.fetchone()
+            if user:
+                return jsonify({"status": "success", "usuario": {"nombre": user[0]}})
+            return jsonify({"status": "error", "message": "Credenciales incorrectas"})
+
+        # --- CASO 2: LISTAR TABLAS ---
+        elif accion == 'listar':
+            cur.execute("SELECT id, nombre, medida, tipo, estado FROM Tablas ORDER BY id ASC")
+            tablas = [{"id": r[0], "nombre": r[1], "medida": r[2], "tipo": r[3], "estado": r[4]} for r in cur.fetchall()]
+            return jsonify(tablas)
+
+        # --- CASO 3: AGREGAR TABLA ---
+        elif accion == 'agregar_tabla':
+            n = request.args.get('nombre')
+            m = request.args.get('medida')
+            t = request.args.get('tipo')
+            cur.execute("INSERT INTO Tablas (nombre, medida, tipo) VALUES (%s, %s, %s)", (n, m, t))
+            conn.commit()
+            return jsonify({"status": "success"})
+
+        return jsonify({"status": "error", "message": "Acción no reconocida"})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
     finally:
         cur.close()
         conn.close()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+
