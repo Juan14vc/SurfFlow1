@@ -9,7 +9,7 @@ async function intentarLogin() {
 
     try {
         // AGREGAMOS: ?accion=login para que Python sepa que es un inicio de sesión
-        const response = await fetch(`${URL_API}?accion=login&user=${user}&pwd=${pass}`);
+        const response = await fetch(`${https://surfflow1.onrender.com/Servlet}?accion=login&user=${user}&pwd=${pass}`);
         const data = await response.json();
 
         if (data.status === "success") {
@@ -26,3 +26,4 @@ async function intentarLogin() {
         alert("El servidor está despertando... espera 30 segundos y reintenta.");
     }
 }
+
