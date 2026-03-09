@@ -77,6 +77,11 @@
             window.location.href = "login.html";
         }
 
+        function gestionar(id) {
+            // Redirige a la ventana de gestión pasando el ID de la tabla por la URL
+            window.location.href = `gestion_individual.html?id=${id}`;
+        }
+
         // Esta función la conectaremos luego con tu app.js para el INSERT
         async function agregarTabla() {
             const nombre = document.getElementById('new-nombre').value;
