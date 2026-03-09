@@ -9,7 +9,8 @@ async function intentarLogin() {
 
     try {
         // AGREGAMOS: ?accion=login para que Python sepa que es un inicio de sesión
-        const response = await fetch(`${https://surfflow1.onrender.com/Servlet}?accion=login&user=${user}&pwd=${pass}`);
+        // FORMA CORRECTA:
+        const response = await fetch(`https://surfflow1.onrender.com/Servlet?accion=login&user=${user}&pwd=${pass}`);
         const data = await response.json();
 
         if (data.status === "success") {
