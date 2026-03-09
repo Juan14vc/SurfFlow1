@@ -8,9 +8,11 @@ async function intentarLogin() {
     }
 
     try {
-        // URL limpia con backticks y solo variables donde corresponde
+        // CORRECCIÓN: La URL va entre comillas invertidas, pero SIN ${} al principio
         const url = `https://surfflow1.onrender.com/Servlet?accion=login&user=${encodeURIComponent(user)}&pwd=${encodeURIComponent(pass)}`;
         
+        console.log("Intentando conectar a:", url);
+
         const response = await fetch(url);
         const data = await response.json();
 
@@ -19,10 +21,10 @@ async function intentarLogin() {
             localStorage.setItem('usuario_logeado', 'true'); 
             window.location.href = "SurfFlow.html"; 
         } else {
-            alert("Credenciales incorrectas.");
+            alert("Credenciales incorrectas ❌");
         }
     } catch (error) {
-        console.error("Error real:", error); // Esto te ayuda a ver fallos en F12
-        alert("El servidor está despertando... espera 30 segundos y reintenta.");
+        console.error("Error detallado:", error);
+        alert("El servidor está despertando. Espera 20 segundos y vuelve a intentar.");
     }
 }
