@@ -42,7 +42,7 @@
 
     <script>
         async function cargarMovimientos() {
-            const res = await fetch('http://localhost:5000/Servlet?accion=listar_movimientos');
+            const res = await fetch('https://surfflow1.onrender.com/Servlet?accion=listar_movimientos');
             const datos = await res.json();
             
             let total = 0;
