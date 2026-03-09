@@ -54,7 +54,7 @@ def inicializar_sistema():
             ON CONFLICT (usuario) DO NOTHING;
         """)
 
-        # 5. Insertar un par de tablas de prueba si el inventario está vacío
+        # 5. Insertar tablas de prueba solo si está vacío
         cursor.execute("SELECT COUNT(*) FROM Tablas")
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
@@ -93,37 +93,44 @@ def gateway():
             return jsonify({"status": "error", "message": "Credenciales inválidas"})
 
         # --- LISTAR INVENTARIO ---
-        if accion == 'listar':
+        elif accion == 'listar':
             cursor.execute("SELECT id, nombre, medida, tipo, estado FROM Tablas ORDER BY id ASC")
             tablas = [{"id": r[0], "nombre": r[1], "medida": r[2], "tipo": r[3], "estado": r[4]} for r in cursor.fetchall()]
             return jsonify(tablas)
 
-       # --- REGISTRAR RESERVA (ALQUILER) ---
-        if accion == 'insertar_reserva':
-            # Capturamos los datos del JS
+        # --- ACTUALIZAR ESTADO (LIBERAR, MANTENIMIENTO O PREPARAR ALQUILER) ---
+        elif accion == 'actualizar_estado':
+            id_tabla = request.args.get('id')
+            nuevo_estado = request.args.get('estado')
+            cursor.execute("UPDATE Tablas SET estado = %s WHERE id = %s", (nuevo_estado, id_tabla))
+            conn.commit()
+            return jsonify({"status": "ok", "message": "Estado actualizado"})
+
+        # --- REGISTRAR RESERVA (ALQUILER FINALIZADO) ---
+        elif accion == 'insertar_reserva':
             tabla_id = request.args.get('tabla_id')
             cliente = request.args.get('cliente')
             monto = request.args.get('monto')
-            referencia = request.args.get('comprobante') # Aquí llega el Yape/Plin
+            referencia = request.args.get('comprobante')
 
+            # Insertamos el movimiento
             sql = """INSERT INTO Reservas (cliente_nombre, monto_pago, comprobante_img, confirmado, tabla_id) 
                      VALUES (%s, %s, %s, %s, %s)"""
             cursor.execute(sql, (cliente, monto, referencia, True, tabla_id))
             
-            # Cambiamos el estado de la tabla automáticamente
+            # Aseguramos que el estado cambie a 'En Uso'
             cursor.execute("UPDATE Tablas SET estado = 'En Uso' WHERE id = %s", (tabla_id,))
             
             conn.commit()
             return jsonify({"status": "ok"})
 
-        # --- LISTAR MOVIMIENTOS (REPORTE) ---
-        if accion == 'listar_movimientos':
+        # --- LISTAR MOVIMIENTOS (REPORTE DE VENTAS) ---
+        elif accion == 'listar_movimientos':
             sql = """SELECT R.fecha_reserva, T.nombre, R.cliente_nombre, R.comprobante_img, R.monto_pago
                      FROM Reservas R 
                      INNER JOIN Tablas T ON R.tabla_id = T.id 
                      ORDER BY R.fecha_reserva DESC"""
             cursor.execute(sql)
-            # El campo R.comprobante_img ahora actúa como 'ref'
             movs = [{
                 "fecha": r[0].strftime("%d/%m %H:%M"),
                 "tabla": r[1],
@@ -132,8 +139,19 @@ def gateway():
                 "monto": float(r[4])
             } for r in cursor.fetchall()]
             return jsonify(movs)
-        
-        
+
+        # --- AGREGAR NUEVA TABLA AL STOCK ---
+        elif accion == 'agregar_tabla':
+            nombre = request.args.get('nombre')
+            medida = request.args.get('medida')
+            tipo = request.args.get('tipo')
+            cursor.execute("INSERT INTO Tablas (nombre, medida, tipo, estado) VALUES (%s, %s, %s, 'Disponible')", 
+                           (nombre, medida, tipo))
+            conn.commit()
+            return jsonify({"status": "success"})
+
+        else:
+            return jsonify({"status": "error", "message": "Acción no reconocida"})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -142,6 +160,5 @@ def gateway():
         conn.close()
 
 if __name__ == '__main__':
-    # Render usa la variable de entorno PORT
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
