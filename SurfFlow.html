@@ -82,19 +82,28 @@
             const nombre = document.getElementById('new-nombre').value;
             const medida = document.getElementById('new-medida').value;
             const tipo = document.getElementById('new-tipo').value;
-
-            if(!nombre || !medida) return alert("Completa los datos de la tabla");
-
-            // Aquí llamaremos a tu API de Python
-            const url = `http://localhost:5000/Servlet?accion=agregar_tabla&nombre=${nombre}&medida=${medida}&tipo=${tipo}`;
-            const res = await fetch(url);
-            const data = await res.json();
-            
-            if(data.status === 'success') {
-                alert("¡Tabla agregada!");
-                location.reload(); // Recarga para ver la nueva tabla
+        
+            if(!nombre || !medida) return alert("Completa los datos de la tabla 🏄‍♂️");
+        
+            // CORRECCIÓN: Quitamos el enlace de google y usamos la URL limpia de tu servidor
+            const url = `https://surfflow1.onrender.com/Servlet?accion=agregar_tabla&nombre=${encodeURIComponent(nombre)}&medida=${encodeURIComponent(medida)}&tipo=${encodeURIComponent(tipo)}`;
+        
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if(data.status === 'success') {
+                    alert("¡Tabla agregada con éxito! ✅");
+                    location.reload(); 
+                } else {
+                    alert("Hubo un problema al guardar la tabla.");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("El servidor tardó mucho en responder. Intenta de nuevo.");
             }
         }
     </script>
 </body>
+
 </html>
