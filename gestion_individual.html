@@ -35,31 +35,30 @@
     const idTabla = params.get('id');
     document.getElementById('id-display').innerText = `#${idTabla}`;
 
-    // 2. Función para avisar a Python
+    // 2. Función para avisar a Python en RENDER
     async function enviarEstado(nuevoEstado) {
         if(!idTabla) return alert("ID no encontrado");
 
-        const url = `http://localhost:5000/Servlet?accion=actualizar_estado&id=${idTabla}&estado=${encodeURIComponent(nuevoEstado)}`;
+        // CAMBIADO: Ahora apunta a tu servidor real
+        const url = `https://surfflow1.onrender.com/Servlet?accion=actualizar_estado&id=${idTabla}&estado=${encodeURIComponent(nuevoEstado)}`;
 
         try {
             const res = await fetch(url);
             const data = await res.json();
 
             if (data.status === "ok") {
-                // --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
                 if (nuevoEstado === 'En Uso') {
-                    // Si Natali marca En Uso, la mandamos directo a llenar los datos del cliente
+                    // Si Natali marca En Uso, la mandamos a llenar los datos del cliente
                     window.location.href = `reserva.html?id=${idTabla}`;
                 } else {
-                    // Si libera la tabla o la manda a mantenimiento, regresa al dashboard
                     alert(`✅ Tabla #${idTabla} actualizada a: ${nuevoEstado}`);
                     window.location.href = "SurfFlow.html";
                 }
             } else {
-                alert("❌ Error al actualizar en SQL.");
+                alert("❌ Error: " + data.message);
             }
         } catch (err) {
-            alert("❌ El servidor Python no responde. ¿Está corriendo app.py?");
+            alert("❌ El servidor de la playa está despertando. Espera 20 segundos.");
         }
     }
 </script>
