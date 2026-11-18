@@ -41,4 +41,9 @@ function gestionar(id) {
     // Redirige a la nueva ventana de gestión pasando el ID
     window.location.href = `gestion_individual.html?id=${id}`;
 }
+
+function cerrarSesion() {
+            localStorage.clear(); // Borra la "llave"
+            window.location.href = "index.html";
+        }
 document.addEventListener("DOMContentLoaded", obtenerDatos);
