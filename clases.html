@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SurfFlow - Clases</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .panel { background: #f1f9ff; border: 1px solid #caf0f8; border-radius: 15px; padding: 20px; margin-bottom: 25px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px; }
+        .grid label { display: flex; flex-direction: column; font-weight: 600; font-size: .85rem; gap: 4px; }
+        input, select { padding: 9px; border: 1px solid #ccc; border-radius: 8px; font-size: .95rem; }
+        h4 { margin: 14px 0 6px; color: #03045e; }
+        .checks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+        .check { background: white; border: 1px solid #caf0f8; border-radius: 10px; padding: 8px 12px; font-size: .9rem; display: flex; align-items: center; gap: 6px; }
+        .check.off { opacity: .5; }
+        .fila-part { display: flex; gap: 6px; margin-bottom: 6px; max-width: 420px; }
+        .fila-part input { flex: 1; }
+        .btn-main { background: #0077b6; color: white; border: none; padding: 12px 22px; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 12px; }
+        .btn-sec { background: white; color: #0077b6; border: 1px solid #0077b6; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+        .btn-peq { border: none; color: white; padding: 6px 10px; border-radius: 6px; cursor: pointer; margin: 2px; }
+        .b-iniciar { background: #0077b6; } .b-completar { background: #2a9d8f; } .b-cancelar { background: #e63946; }
+        .estado { padding: 4px 10px; border-radius: 20px; font-size: .8em; font-weight: bold; }
+        .e-programada { background: #e0f2fe; color: #0369a1; }
+        .e-en-curso { background: #fff3cd; color: #856404; }
+        .e-completada { background: #d4edda; color: #155724; }
+        .e-cancelada { background: #f8d7da; color: #721c24; }
+        .vacio { color: #666; font-size: .9rem; }
+        .filtro { margin: 10px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="SurfFlow.html" style="text-decoration:none;">← Volver al Dashboard</a>
+    <h1>🎓 Clases</h1>
+
+    <div class="panel">
+        <h3>Programar clase</h3>
+        <div class="grid">
+            <label>Paquete del alumno
+                <select id="paquete" onchange="cambiarPaquete()"><option value="">Clase suelta (sin paquete)</option></select>
+            </label>
+            <label>Fecha y hora
+                <input type="datetime-local" id="fecha">
+            </label>
+            <label>Duración (min)
+                <input type="number" id="duracion" value="60" min="15" step="15">
+            </label>
+            <label>Tipo de clase
+                <select id="tipo" onchange="ajustarTipo()">
+                    <option value="Individual">Individual (1 alumno)</option>
+                    <option value="Pareja">En pareja (2 alumnos)</option>
+                    <option value="Grupal">Grupal (3 o más)</option>
+                </select>
+            </label>
+            <label id="bloque-monto">Monto S/ (clase suelta)
+                <input type="number" id="monto" value="0" min="0" step="0.01">
+            </label>
+        </div>
+
+        <h4>Alumnos</h4>
+        <div id="participantes"></div>
+        <button type="button" id="btn-add-part" class="btn-sec" onclick="agregarParticipante()" style="display:none;">+ Agregar alumno</button>
+
+        <h4>Tablas (solo las de uso "Clases")</h4>
+        <div id="lista-tablas-clase" class="checks"><span class="vacio">Cargando...</span></div>
+
+        <h4>Instructores</h4>
+        <div id="lista-instructores" class="checks"><span class="vacio">Cargando...</span></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input type="text" id="nuevo-instructor" placeholder="Nuevo instructor">
+            <button type="button" class="btn-sec" onclick="agregarInstructor()">Agregar instructor</button>
+        </div>
+
+        <button class="btn-main" onclick="guardarClase()">Guardar clase</button>
+    </div>
+
+    <h3>Clases registradas</h3>
+    <div class="filtro">
+        <select id="filtro" onchange="cargarClases()">
+            <option value="proximas">Próximas y en curso</option>
+            <option value="historial">Historial (completadas y canceladas)</option>
+            <option value="todas">Todas</option>
+        </select>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Fecha y hora</th><th>Tipo</th><th>Alumnos</th><th>Instructores</th><th>Tablas</th><th>Cobro</th><th>Estado</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="lista-clases"><tr><td colspan="8">Cargando...</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+    exigirLogin();
+    const params = new URLSearchParams(window.location.search);
+    let nombres = [""];
+    let paquetes = [];
+    let paqueteSel = null;
+
+    const tipoActual = () => document.getElementById("tipo").value;
+
+    // ---------- Alumnos ----------
+    function renderParticipantes() {
+        const cont = document.getElementById("participantes");
+        cont.innerHTML = nombres.map((n, i) => `
+            <div class="fila-part">
+                <input type="text" value="${esc(n)}" placeholder="Nombre del alumno ${i + 1}"
+                       oninput="nombres[${i}] = this.value" ${paqueteSel && i === 0 ? "readonly" : ""}>
+                ${tipoActual() === "Grupal" && i >= 3 ? `<button type="button" class="btn-sec" onclick="quitarParticipante(${i})">✖</button>` : ""}
+            </div>`).join("");
+        document.getElementById("btn-add-part").style.display = tipoActual() === "Grupal" ? "inline-block" : "none";
+    }
+
+    function ajustarTipo() {
+        const tipo = tipoActual();
+        const objetivo = tipo === "Individual" ? 1 : tipo === "Pareja" ? 2 : 3;
+        if (tipo !== "Grupal") nombres = nombres.slice(0, objetivo);
+        while (nombres.length < objetivo) nombres.push("");
+        renderParticipantes();
+    }
+
+    function agregarParticipante() { nombres.push(""); renderParticipantes(); }
+    function quitarParticipante(i) { nombres.splice(i, 1); renderParticipantes(); }
+
+    // ---------- Paquete ----------
+    async function cargarPaquetes() {
+        const data = await llamar({ accion: "listar_paquetes" });
+        paquetes = data.filter(p => p.estado === "Activo" && p.por_agendar > 0);
+        document.getElementById("paquete").innerHTML =
+            '<option value="">Clase suelta (sin paquete)</option>' +
+            paquetes.map(p => `<option value="${p.id}">${esc(p.alumno)} — ${p.por_agendar} por agendar de ${p.clases_total}</option>`).join("");
+    }
+
+    function cambiarPaquete() {
+        const id = document.getElementById("paquete").value;
+        paqueteSel = paquetes.find(p => String(p.id) === id) || null;
+        document.getElementById("bloque-monto").style.display = paqueteSel ? "none" : "";
+        if (paqueteSel) nombres[0] = paqueteSel.alumno;
+        renderParticipantes();
+    }
+
+    // ---------- Tablas e instructores ----------
+    async function cargarTablasClase() {
+        const data = await llamar({ accion: "listar" });
+        const tablas = data.filter(t => t.uso === "Clases");
+        const cont = document.getElementById("lista-tablas-clase");
+        if (!tablas.length) {
+            cont.innerHTML = '<span class="vacio">No hay tablas de uso "Clases". Agrégalas en el dashboard.</span>';
+            return;
+        }
+        cont.innerHTML = tablas.map(t => `
+            <label class="check ${t.estado === "Mantenimiento" ? "off" : ""}">
+                <input type="checkbox" value="${t.id}" ${t.estado === "Mantenimiento" ? "disabled" : ""}>
+                ${esc(t.nombre)} <small>(${esc(t.estado)})</small>
+            </label>`).join("");
+    }
+
+    async function cargarInstructores() {
+        const data = await llamar({ accion: "listar_instructores" });
+        const cont = document.getElementById("lista-instructores");
+        if (!data.length) {
+            cont.innerHTML = '<span class="vacio">Aún no hay instructores. Agrega el primero abajo.</span>';
+            return;
+        }
+        cont.innerHTML = data.map(i => `
+            <label class="check"><input type="checkbox" value="${i.id}"> ${esc(i.nombre)}</label>`).join("");
+    }
+
+    async function agregarInstructor() {
+        const nombre = document.getElementById("nuevo-instructor").value.trim();
+        if (!nombre) return alert("Escribe el nombre del instructor");
+        try {
+            await llamar({ accion: "agregar_instructor", nombre });
+            document.getElementById("nuevo-instructor").value = "";
+            cargarInstructores();
+        } catch (e) { alert("❌ " + e.message); }
+    }
+
+    const marcados = selector => [...document.querySelectorAll(selector + " input:checked")].map(c => c.value);
+
+    // ---------- Guardar clase ----------
+    async function guardarClase() {
+        const fecha = document.getElementById("fecha").value;
+        if (!fecha) return alert("Elige la fecha y hora de la clase");
+        try {
+            await llamar({
+                accion: "crear_clase",
+                fecha_hora: new Date(fecha).toISOString(),
+                duracion: document.getElementById("duracion").value,
+                tipo: tipoActual(),
+                tablas: marcados("#lista-tablas-clase").join(","),
+                instructores: marcados("#lista-instructores").join(","),
+                participante: nombres.map(n => n.trim()).filter(Boolean),
+                paquete_id: document.getElementById("paquete").value,
+                monto: document.getElementById("monto").value || 0
+            });
+            alert("✅ Clase programada");
+            nombres = [""];
+            paqueteSel = null;
+            document.getElementById("paquete").value = "";
+            document.getElementById("tipo").value = "Individual";
+            document.getElementById("fecha").value = "";
+            document.getElementById("monto").value = 0;
+            document.getElementById("bloque-monto").style.display = "";
+            document.querySelectorAll("#lista-tablas-clase input, #lista-instructores input").forEach(c => c.checked = false);
+            ajustarTipo();
+            await Promise.all([cargarPaquetes(), cargarClases()]);
+        } catch (e) {
+            alert("❌ " + e.message);
+        }
+    }
+
+    // ---------- Lista de clases ----------
+    function botonesClase(c) {
+        const btn = (estado, clase, texto) =>
+            `<button class="btn-peq ${clase}" onclick="cambiarEstadoClase(${c.id}, '${estado}')">${texto}</button>`;
+        if (c.estado === "Programada") return btn("En curso", "b-iniciar", "▶ Iniciar") + btn("Completada", "b-completar", "✔ Completar") + btn("Cancelada", "b-cancelar", "✖ Cancelar");
+        if (c.estado === "En curso") return btn("Completada", "b-completar", "✔ Finalizar") + btn("Cancelada", "b-cancelar", "✖ Cancelar");
+        return "";
+    }
+
+    async function cargarClases() {
+        const tbody = document.getElementById("lista-clases");
+        try {
+            const data = await llamar({ accion: "listar_clases", filtro: document.getElementById("filtro").value });
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="8">No hay clases en esta lista.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(c => `
+                <tr>
+                    <td>${fmtFecha(c.fecha)}<br><small>${fmtMin(c.duracion)}</small></td>
+                    <td>${esc(c.tipo)}</td>
+                    <td>${c.participantes.map(esc).join(", ")}</td>
+                    <td>${c.instructores.map(esc).join(", ")}</td>
+                    <td>${c.tablas.map(esc).join(", ")}</td>
+                    <td>${c.paquete_id ? "Paquete #" + c.paquete_id : (c.monto > 0 ? soles(c.monto) : "—")}</td>
+                    <td><span class="estado e-${c.estado.toLowerCase().replace(/\s+/g, "-")}">${esc(c.estado)}</span></td>
+                    <td>${botonesClase(c)}</td>
+                </tr>`).join("");
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="8">❌ ${esc(e.message)}</td></tr>`;
+        }
+    }
+
+    async function cambiarEstadoClase(id, estado) {
+        const textos = { "En curso": "iniciar", "Completada": "marcar como completada", "Cancelada": "cancelar" };
+        if (!confirm(`¿Seguro que quieres ${textos[estado]} esta clase?`)) return;
+        try {
+            await llamar({ accion: "cambiar_estado_clase", clase_id: id, estado });
+            await Promise.all([cargarClases(), cargarTablasClase(), cargarPaquetes()]);
+        } catch (e) { alert("❌ " + e.message); }
+    }
+
+    // ---------- Inicio ----------
+    async function iniciar() {
+        ajustarTipo();
+        try {
+            await Promise.all([cargarPaquetes(), cargarTablasClase(), cargarInstructores()]);
+        } catch (e) {
+            alert("❌ No se pudo cargar la información: " + e.message);
+        }
+        const pq = params.get("paquete");
+        if (pq) { document.getElementById("paquete").value = pq; cambiarPaquete(); }
+        const tb = params.get("tabla");
+        if (tb) {
+            const c = document.querySelector(`#lista-tablas-clase input[value="${tb}"]`);
+            if (c && !c.disabled) c.checked = true;
+        }
+        cargarClases();
+    }
+    iniciar();
+</script>
+</body>
+</html>

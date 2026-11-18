@@ -2,19 +2,27 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SurfFlow - Modificar Estado</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Poppins', sans-serif; background: #f0faff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-        .btn-status { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; font-size: 1rem; }
-        
-        .btn-uso { background: #ffca28; color: #5f4b00; } /* Amarillo */
-        .btn-liberar { background: #66bb6a; color: white; } /* Verde */
-        .btn-mant { background: #ef5350; color: white; } /* Rojo */
-        
+        .card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 420px; text-align: center; }
+        .btn-status { width: 100%; padding: 15px; margin: 8px 0; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; font-size: 1rem; }
+        .btn-alquilar { background: #ffca28; color: #5f4b00; }
+        .btn-clase { background: #7c3aed; color: white; }
+        .btn-liberar { background: #66bb6a; color: white; }
+        .btn-mant { background: #ef5350; color: white; }
+        .btn-extender { background: #0077b6; color: white; }
         .btn-status:hover { transform: scale(1.02); opacity: 0.9; }
         .id-badge { background: #0077b6; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; }
+        .info { background: #f1f9ff; border-radius: 12px; padding: 12px; margin: 12px 0; font-size: .95rem; }
+        .timer { font-weight: 600; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+        .timer.en-tiempo { color: #2e7d32; }
+        .timer.por-vencer { color: #e67e22; }
+        .timer.excedido { color: #c1121f; }
+        .extender { display: flex; gap: 8px; margin-top: 10px; }
+        .extender input { flex: 1; min-width: 0; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -22,45 +30,112 @@
 <div class="card">
     <a href="SurfFlow.html" style="text-decoration:none; color:#0077b6; font-size:0.8rem;">← Volver al Dashboard</a>
     <h2>Gestionar Tabla <span id="id-display" class="id-badge">...</span></h2>
-    <p>Selecciona el nuevo estado:</p>
-
-    <button class="btn-status btn-uso" onclick="enviarEstado('En Uso')">Marcar: EN USO 🟡</button>
-    <button class="btn-status btn-liberar" onclick="enviarEstado('Disponible')">Marcar: LIBERAR (Disponible) 🟢</button>
-    <button class="btn-status btn-mant" onclick="enviarEstado('Mantenimiento')">Marcar: MANTENIMIENTO 🔴</button>
+    <div id="info" class="info">Cargando...</div>
+    <div id="acciones"></div>
 </div>
 
+<script src="api.js"></script>
 <script>
-    // 1. Capturar el ID de la URL
-    const params = new URLSearchParams(window.location.search);
-    const idTabla = params.get('id');
+    exigirLogin();
+    const idTabla = new URLSearchParams(window.location.search).get('id');
     document.getElementById('id-display').innerText = `#${idTabla}`;
+    let tabla = null;
+    let reloj_id = null;
 
-    // 2. Función para avisar a Python en RENDER
-    async function enviarEstado(nuevoEstado) {
-        if(!idTabla) return alert("ID no encontrado");
-
-        // CAMBIADO: Ahora apunta a tu servidor real
-        const url = `https://surfflow1.onrender.com/Servlet?accion=actualizar_estado&id=${idTabla}&estado=${encodeURIComponent(nuevoEstado)}`;
-
+    async function cargar() {
         try {
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (data.status === "ok") {
-                if (nuevoEstado === 'En Uso') {
-                    // Si Natali marca En Uso, la mandamos a llenar los datos del cliente
-                    window.location.href = `reserva.html?id=${idTabla}`;
-                } else {
-                    alert(`✅ Tabla #${idTabla} actualizada a: ${nuevoEstado}`);
-                    window.location.href = "SurfFlow.html";
-                }
-            } else {
-                alert("❌ Error: " + data.message);
-            }
-        } catch (err) {
-            alert("❌ El servidor de la playa está despertando. Espera 20 segundos.");
+            tabla = await llamar({ accion: 'obtener_tabla', id: idTabla });
+            pintar();
+        } catch (e) {
+            document.getElementById('info').textContent = '❌ ' + e.message;
         }
     }
+
+    function pintar() {
+        const t = tabla;
+        const alquilerActivo = t.estado === 'En Uso' && t.reserva_id;
+        let info = `<strong>${esc(t.nombre)}</strong><br>${esc(t.medida || '')} · ${esc(t.tipo || '')} · Uso: ${esc(t.uso)}<br>Estado: <strong>${esc(t.estado)}</strong>`;
+
+        if (alquilerActivo) {
+            info += `<br>Cliente: ${esc(t.cliente)}<br>Pagó: ${fmtMin(t.minutos)}<div id="reloj" class="timer"></div>`;
+        } else if (t.en_clase) {
+            info += `<br>👥 En una clase en curso`;
+        }
+        document.getElementById('info').innerHTML = info;
+
+        let html = '';
+        if (t.en_clase) {
+            html += `<p style="font-size:.9rem">Esta tabla se libera sola al finalizar la clase en la sección Clases.</p>
+                     <button class="btn-status btn-clase" onclick="location.href='clases.html'">Ir a Clases</button>`;
+        } else {
+            if (t.uso === 'Alquiler' && t.estado === 'Disponible') {
+                html += `<button class="btn-status btn-alquilar" onclick="location.href='reserva.html?id=${t.id}'">Alquilar 🟡</button>`;
+            }
+            if (t.uso === 'Clases' && t.estado !== 'Mantenimiento') {
+                html += `<button class="btn-status btn-clase" onclick="location.href='clases.html?tabla=${t.id}'">Programar clase 🎓</button>`;
+            }
+            if (alquilerActivo) {
+                html += `<div class="extender">
+                            <input type="number" id="ext-min" placeholder="Minutos extra" min="5" step="5">
+                            <input type="number" id="ext-monto" placeholder="S/ extra" min="0" step="0.01">
+                         </div>
+                         <button class="btn-status btn-extender" onclick="extender()">Extender tiempo ➕</button>`;
+            }
+            if (t.estado !== 'Disponible') {
+                html += `<button class="btn-status btn-liberar" onclick="cambiarEstado('Disponible')">Marcar: LIBERAR (Disponible) 🟢</button>`;
+            }
+            if (t.estado !== 'Mantenimiento') {
+                html += `<button class="btn-status btn-mant" onclick="cambiarEstado('Mantenimiento')">Marcar: MANTENIMIENTO 🔴</button>`;
+            }
+        }
+        document.getElementById('acciones').innerHTML = html;
+
+        clearInterval(reloj_id);
+        if (alquilerActivo && t.hora_fin) {
+            tick();
+            reloj_id = setInterval(tick, 1000);
+        }
+    }
+
+    function tick() {
+        const el = document.getElementById('reloj');
+        if (!el) return;
+        const restante = tabla.hora_fin * 1000 - Date.now();
+        if (restante >= 0) {
+            el.textContent = `⏱️ Restan ${reloj(restante)}`;
+            el.className = 'timer ' + (restante <= 5 * 60 * 1000 ? 'por-vencer' : 'en-tiempo');
+        } else {
+            el.textContent = `⚠️ Excedido +${reloj(-restante)}`;
+            el.className = 'timer excedido';
+        }
+    }
+
+    async function cambiarEstado(estado) {
+        const texto = estado === 'Disponible' ? 'liberar' : 'poner en mantenimiento';
+        if (!confirm(`¿Seguro que quieres ${texto} la tabla #${idTabla}?`)) return;
+        try {
+            await llamar({ accion: 'actualizar_estado', id: idTabla, estado });
+            alert(`✅ Tabla #${idTabla} actualizada a: ${estado}`);
+            window.location.href = 'SurfFlow.html';
+        } catch (e) {
+            alert('❌ ' + e.message);
+        }
+    }
+
+    async function extender() {
+        const minutos = document.getElementById('ext-min').value;
+        const monto = document.getElementById('ext-monto').value || 0;
+        if (!minutos) return alert('Indica cuántos minutos agregar');
+        try {
+            await llamar({ accion: 'extender_reserva', reserva_id: tabla.reserva_id, minutos, monto });
+            alert('✅ Tiempo extendido');
+            cargar();
+        } catch (e) {
+            alert('❌ ' + e.message);
+        }
+    }
+
+    cargar();
 </script>
 
 </body>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SurfFlow - Paquetes</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .panel { background: #f1f9ff; border: 1px solid #caf0f8; border-radius: 15px; padding: 20px; margin-bottom: 25px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        .grid label { display: flex; flex-direction: column; font-weight: 600; font-size: .85rem; gap: 4px; }
+        input, select { padding: 9px; border: 1px solid #ccc; border-radius: 8px; font-size: .95rem; }
+        .btn-main { background: #2a9d8f; color: white; border: none; padding: 12px 22px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .btn-sec { background: white; color: #0077b6; border: 1px solid #0077b6; padding: 8px 14px; border-radius: 8px; cursor: pointer; margin: 2px; }
+        .btn-azul { background: #0077b6; color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; margin: 2px; }
+
+        .tarjeta { border: 1px solid #ddd; border-radius: 15px; padding: 18px; margin-bottom: 16px; background: white; }
+        .tarjeta.cerrado { opacity: .75; background: #fafafa; }
+        .cab { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .cab h3 { margin: 0; color: #03045e; }
+        .estado { padding: 4px 10px; border-radius: 20px; font-size: .8em; font-weight: bold; }
+        .p-activo { background: #d4edda; color: #155724; }
+        .p-completado { background: #e0f2fe; color: #0369a1; }
+        .barra { background: #e5e7eb; border-radius: 20px; height: 14px; margin: 12px 0 8px; overflow: hidden; }
+        .barra > div { background: #2a9d8f; height: 100%; }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .chip { background: #f1f9ff; border: 1px solid #caf0f8; border-radius: 10px; padding: 6px 10px; font-size: .85rem; }
+        .chip.alerta { background: #fff3cd; border-color: #f4d58d; }
+        .detalle { margin-top: 12px; border-top: 1px dashed #ccc; padding-top: 10px; font-size: .9rem; }
+        .detalle h4 { margin: 8px 0 4px; }
+        .detalle ul { margin: 0; padding-left: 20px; }
+        .vacio { color: #666; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="SurfFlow.html" style="text-decoration:none;">← Volver al Dashboard</a>
+    <h1>📦 Paquetes de clases</h1>
+
+    <div class="panel">
+        <h3>Nuevo paquete</h3>
+        <div class="grid">
+            <label>Alumno
+                <input type="text" id="alumno" placeholder="Nombre completo">
+            </label>
+            <label>Teléfono (opcional)
+                <input type="text" id="telefono" placeholder="Ej: 999 999 999">
+            </label>
+            <label>Número de clases
+                <input type="number" id="clases-total" value="5" min="1" max="100">
+            </label>
+            <label>Precio del paquete S/
+                <input type="number" id="precio-total" value="0" min="0" step="0.01">
+            </label>
+            <label>Pago inicial S/ (opcional)
+                <input type="number" id="pago-inicial" value="0" min="0" step="0.01">
+            </label>
+            <label>Referencia Yape/Plin
+                <input type="text" id="referencia" placeholder="Código de operación">
+            </label>
+        </div>
+        <button class="btn-main" onclick="crearPaquete()">Crear paquete</button>
+    </div>
+
+    <h3>Paquetes</h3>
+    <div id="lista-paquetes"><p class="vacio">Cargando...</p></div>
+</div>
+
+<script src="api.js"></script>
+<script>
+    exigirLogin();
+    const detallesAbiertos = new Set();
+
+    async function crearPaquete() {
+        const alumno = document.getElementById("alumno").value.trim();
+        if (!alumno) return alert("Escribe el nombre del alumno");
+        try {
+            await llamar({
+                accion: "crear_paquete",
+                alumno,
+                telefono: document.getElementById("telefono").value,
+                clases_total: document.getElementById("clases-total").value,
+                precio_total: document.getElementById("precio-total").value || 0,
+                monto: document.getElementById("pago-inicial").value || 0,
+                referencia: document.getElementById("referencia").value
+            });
+            alert("✅ Paquete creado");
+            ["alumno", "telefono", "referencia"].forEach(id => document.getElementById(id).value = "");
+            document.getElementById("clases-total").value = 5;
+            document.getElementById("precio-total").value = 0;
+            document.getElementById("pago-inicial").value = 0;
+            cargarPaquetes();
+        } catch (e) {
+            alert("❌ " + e.message);
+        }
+    }
+
+    function tarjeta(p) {
+        const avance = Math.min(100, Math.round((p.completadas / p.clases_total) * 100));
+        const activo = p.estado === "Activo";
+        return `
+        <div class="tarjeta ${activo ? "" : "cerrado"}">
+            <div class="cab">
+                <h3>${esc(p.alumno)} <small>${p.telefono ? "· " + esc(p.telefono) : ""}</small></h3>
+                <span class="estado p-${p.estado.toLowerCase()}">${esc(p.estado)}</span>
+            </div>
+            <div class="barra"><div style="width:${avance}%"></div></div>
+            <div class="chips">
+                <span class="chip">✅ Completadas: <strong>${p.completadas}</strong> de ${p.clases_total}</span>
+                <span class="chip"><strong>Restan: ${p.restantes}</strong></span>
+                <span class="chip">📅 Agendadas: ${p.programadas}</span>
+                <span class="chip ${p.por_agendar > 0 && activo ? "alerta" : ""}">🕓 Por agendar: ${p.por_agendar}</span>
+            </div>
+            <div class="chips">
+                <span class="chip">Precio: ${soles(p.precio_total)}</span>
+                <span class="chip">Pagado: ${soles(p.pagado)}</span>
+                <span class="chip ${p.saldo > 0 ? "alerta" : ""}">Saldo: ${soles(p.saldo)}</span>
+                <span class="chip">Comprado: ${esc(p.fecha_compra)}</span>
+            </div>
+            <div>
+                ${activo && p.por_agendar > 0 ? `<button class="btn-azul" onclick="location.href='clases.html?paquete=${p.id}'">📅 Agendar clase</button>` : ""}
+                <button class="btn-sec" onclick="registrarPago(${p.id})">💵 Registrar pago</button>
+                <button class="btn-sec" onclick="verDetalle(${p.id})">🔍 Ver detalle</button>
+            </div>
+            <div class="detalle" id="detalle-${p.id}" style="display:none;"></div>
+        </div>`;
+    }
+
+    async function cargarPaquetes() {
+        const cont = document.getElementById("lista-paquetes");
+        try {
+            const data = await llamar({ accion: "listar_paquetes" });
+            if (!data.length) {
+                cont.innerHTML = '<p class="vacio">Aún no hay paquetes. Crea el primero arriba.</p>';
+                return;
+            }
+            cont.innerHTML = data.map(tarjeta).join("");
+            detallesAbiertos.forEach(id => mostrarDetalle(id));
+        } catch (e) {
+            cont.innerHTML = `<p class="vacio">❌ ${esc(e.message)}</p>`;
+        }
+    }
+
+    async function registrarPago(id) {
+        const monto = prompt("Monto del pago en S/:");
+        if (monto === null) return;
+        const referencia = prompt("Referencia Yape/Plin (opcional):") || "";
+        try {
+            await llamar({ accion: "agregar_pago", paquete_id: id, monto, referencia });
+            alert("✅ Pago registrado");
+            cargarPaquetes();
+        } catch (e) {
+            alert("❌ " + e.message);
+        }
+    }
+
+    async function mostrarDetalle(id) {
+        const caja = document.getElementById("detalle-" + id);
+        if (!caja) return;
+        try {
+            const d = await llamar({ accion: "detalle_paquete", id });
+            const clases = d.clases.length
+                ? d.clases.map(c => `<li>${fmtFecha(c.fecha)} · ${esc(c.tipo)} · ${fmtMin(c.duracion)} — <strong>${esc(c.estado)}</strong></li>`).join("")
+                : '<li class="vacio">Sin clases agendadas todavía</li>';
+            const pagos = d.pagos.length
+                ? d.pagos.map(g => `<li>${fmtFecha(g.fecha)} · ${soles(g.monto)}${g.ref ? " · Ref: " + esc(g.ref) : ""}</li>`).join("")
+                : '<li class="vacio">Sin pagos registrados</li>';
+            caja.innerHTML = `<h4>Clases</h4><ul>${clases}</ul><h4>Pagos</h4><ul>${pagos}</ul>`;
+            caja.style.display = "block";
+        } catch (e) {
+            caja.innerHTML = "❌ " + esc(e.message);
+            caja.style.display = "block";
+        }
+    }
+
+    async function verDetalle(id) {
+        const caja = document.getElementById("detalle-" + id);
+        if (caja.style.display === "block") {
+            caja.style.display = "none";
+            detallesAbiertos.delete(id);
+            return;
+        }
+        detallesAbiertos.add(id);
+        await mostrarDetalle(id);
+    }
+
+    cargarPaquetes();
+</script>
+</body>
+</html>

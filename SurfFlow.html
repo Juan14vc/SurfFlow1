@@ -5,10 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SurfFlow - Inventario Natali</title>
     <link rel="stylesheet" href="style.css">
-    
+    <style>
+        .nav-botones { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        .nav-botones button { padding: 12px 20px; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .panel-alta { background: #f1f9ff; padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid #caf0f8; }
+        .panel-alta .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .panel-alta input, .panel-alta select { padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+        .ayuda { font-size: .8rem; color: #555; margin: 8px 0 0; }
+
+        .uso-badge { padding: 4px 10px; border-radius: 20px; font-size: .8em; font-weight: bold; }
+        .uso-alquiler { background: #e0f2fe; color: #0369a1; }
+        .uso-clases { background: #ede9fe; color: #6d28d9; }
+
+        .tiempo-pagado { font-size: .8rem; color: #555; }
+        .timer { font-weight: bold; font-variant-numeric: tabular-nums; }
+        .timer.en-tiempo { color: #2e7d32; }
+        .timer.por-vencer { color: #e67e22; }
+        .timer.excedido { color: #c1121f; animation: parpadeo 1s infinite; }
+        @keyframes parpadeo { 50% { opacity: .35; } }
+
+        #alerta-tiempo { display: none; background: #fde8e8; color: #c1121f; border: 2px solid #c1121f;
+                         padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; }
+    </style>
+
     <script>
         if (localStorage.getItem('usuario_logeado') !== 'true') {
-            window.location.href = "login.html";
+            window.location.href = "index.html";
         }
     </script>
 </head>
@@ -21,30 +43,38 @@
                 Cerrar Sesión 🚪
             </button>
         </div>
-        
-        <p>Hola, <strong id="nombre-admin">Admin</strong>. Gestiona tus tablas y ventas hoy.</p>
+
+        <p>Hola, <strong id="nombre-admin">Admin</strong>. Gestiona tus tablas, clases y ventas hoy.</p>
         <hr>
 
-        <div style="background: #f1f9ff; padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid #caf0f8;">
-            <h3>➕ Agregar Nueva Tabla al Stock</h3>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <input type="text" id="new-nombre" placeholder="Nombre (Ej: Funboard Roja)" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc; flex: 1;">
-                <input type="text" id="new-medida" placeholder="Medida (Ej: 7'2)" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100px;">
-                <select id="new-tipo" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+        <div id="alerta-tiempo"></div>
+
+        <div class="panel-alta">
+            <h3>➕ Agregar Tablas al Stock</h3>
+            <div class="fila">
+                <input type="text" id="new-nombre" placeholder="Nombre (Ej: Funboard Roja)" style="flex: 1; min-width: 180px;">
+                <input type="text" id="new-medida" placeholder="Medida (Ej: 7'2)" style="width: 100px;">
+                <select id="new-tipo">
                     <option value="Softboard">Softboard</option>
                     <option value="Fibra">Fibra</option>
                     <option value="Longboard">Longboard</option>
                 </select>
+                <select id="new-uso">
+                    <option value="Alquiler">Uso: Alquiler</option>
+                    <option value="Clases">Uso: Clases</option>
+                </select>
+                <input type="number" id="new-cantidad" value="1" min="1" max="100" style="width: 80px;" title="Cantidad de tablas iguales">
                 <button onclick="agregarTabla()" style="padding: 10px 20px; background: #2a9d8f; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
-                    Guardar Tabla
+                    Guardar
                 </button>
             </div>
+            <p class="ayuda">Con cantidad mayor a 1 se crean todas de golpe y se numeran solas (Ej: Funboard Roja #1, #2, #3…).</p>
         </div>
 
-        <div style="margin-bottom: 20px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
-            <button onclick="location.href='movimientos.html'" style="padding: 12px 20px; background: #0077b6; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold;">
-                📊 Ver Reporte de Ventas
-            </button>
+        <div class="nav-botones">
+            <button style="background: #6d28d9;" onclick="location.href='clases.html'">🎓 Clases</button>
+            <button style="background: #2a9d8f;" onclick="location.href='paquetes.html'">📦 Paquetes</button>
+            <button style="background: #0077b6;" onclick="location.href='movimientos.html'">📊 Ver Reporte de Ventas</button>
         </div>
 
         <div class="table-container">
@@ -55,60 +85,45 @@
                         <th>Nombre de Tabla</th>
                         <th>Medida</th>
                         <th>Tipo</th>
+                        <th>Uso</th>
                         <th>Estado</th>
+                        <th>Tiempo de alquiler</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody id="lista-tablas">
-                    <tr><td colspan="6">Cargando datos desde la playa...</td></tr>
+                    <tr><td colspan="8">Cargando datos desde la playa...</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 
+    <script src="api.js"></script>
     <script src="app.js"></script>
-    
     <script>
-        // Mostrar nombre de Natali
         document.getElementById('nombre-admin').innerText = localStorage.getItem('nombre_admin') || 'Admin';
 
-        function cerrarSesion() {
-            localStorage.clear(); // Borra la "llave"
-            window.location.href = "index.html";
-        }
-
-        function gestionar(id) {
-            // Redirige a la ventana de gestión pasando el ID de la tabla por la URL
-            window.location.href = `gestion_individual.html?id=${id}`;
-        }
-
-        // Esta función la conectaremos luego con tu app.js para el INSERT
         async function agregarTabla() {
-            const nombre = document.getElementById('new-nombre').value;
-            const medida = document.getElementById('new-medida').value;
+            const nombre = document.getElementById('new-nombre').value.trim();
+            const medida = document.getElementById('new-medida').value.trim();
             const tipo = document.getElementById('new-tipo').value;
-        
-            if(!nombre || !medida) return alert("Completa los datos de la tabla 🏄‍♂️");
-        
-            // CORRECCIÓN: Quitamos el enlace de google y usamos la URL limpia de tu servidor
-            const url = `https://surfflow1.onrender.com/Servlet?accion=agregar_tabla&nombre=${encodeURIComponent(nombre)}&medida=${encodeURIComponent(medida)}&tipo=${encodeURIComponent(tipo)}`;
-        
+            const uso = document.getElementById('new-uso').value;
+            const cantidad = parseInt(document.getElementById('new-cantidad').value, 10) || 1;
+
+            if (!nombre || !medida) return alert("Completa los datos de la tabla 🏄‍♂️");
+            if (cantidad < 1 || cantidad > 100) return alert("La cantidad debe estar entre 1 y 100");
+
             try {
-                const res = await fetch(url);
-                const data = await res.json();
-                
-                if(data.status === 'success') {
-                    alert("¡Tabla agregada con éxito! ✅");
-                    location.reload(); 
-                } else {
-                    alert("Hubo un problema al guardar la tabla.");
-                }
+                const data = await llamar({ accion: 'agregar_tabla', nombre, medida, tipo, uso, cantidad });
+                alert(`✅ ${data.creadas} tabla(s) agregada(s)`);
+                document.getElementById('new-nombre').value = '';
+                document.getElementById('new-cantidad').value = 1;
+                obtenerDatos();
             } catch (error) {
                 console.error("Error:", error);
-                alert("El servidor tardó mucho en responder. Intenta de nuevo.");
+                alert("❌ " + error.message);
             }
         }
     </script>
 </body>
-
 </html>

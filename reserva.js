@@ -1,39 +1,58 @@
-const URL_API = "https://surfflow1.onrender.com/Servlet";
-const urlParams = new URLSearchParams(window.location.search);
-const idActual = urlParams.get('id');
+// reserva.js - registrar alquiler (requiere api.js cargado antes)
+exigirLogin();
 
-// Mostrar el ID en la interfaz
-if(document.getElementById('id-txt')) {
-    document.getElementById('id-txt').innerText = idActual || "Error";
+const idActual = new URLSearchParams(window.location.search).get("id");
+const form = document.getElementById("reservaForm");
+const btn = document.getElementById("btn");
+const aviso = document.getElementById("aviso");
+
+function bloquear(mensaje) {
+    aviso.textContent = mensaje;
+    aviso.style.display = "block";
+    form.querySelectorAll("input, button").forEach(el => el.disabled = true);
 }
 
-document.getElementById('reservaForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('btn');
-    btn.disabled = true;
-    btn.innerText = "⏳ Guardando...";
-
-    const params = new URLSearchParams({
-        accion: "insertar_reserva",
-        tabla_id: idActual,
-        cliente: document.getElementById('cliente').value,
-        monto: document.getElementById('monto').value,
-        comprobante: document.getElementById('ref').value // Referencia Yape/Plin
+// Botones de tiempo rápido
+document.querySelectorAll(".rapidos button").forEach(b => {
+    b.addEventListener("click", () => {
+        document.getElementById("minutos").value = b.dataset.min;
     });
+});
+
+async function cargarTabla() {
+    if (!idActual) return bloquear("No se indicó la tabla.");
+    try {
+        const t = await llamar({ accion: "obtener_tabla", id: idActual });
+        document.getElementById("nombre-tabla").textContent = `${t.nombre} (#${t.id})`;
+        if (t.uso !== "Alquiler") bloquear("Esta tabla es de uso para clases, no se alquila.");
+        else if (t.estado === "Mantenimiento") bloquear("Esta tabla está en mantenimiento.");
+        else if (t.estado === "En Uso" && t.reserva_id) bloquear("Esta tabla ya está alquilada.");
+    } catch (e) {
+        bloquear("❌ " + e.message);
+    }
+}
+
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    btn.disabled = true;
+    btn.textContent = "⏳ Guardando...";
 
     try {
-        const res = await fetch(`${URL_API}?${params}`);
-        const data = await res.json();
-        
-        if (data.status === "ok") {
-            alert("✅ ¡Alquiler registrado con éxito!");
-            window.location.href = "SurfFlow.html";
-        } else {
-            alert("❌ Error al guardar.");
-            btn.disabled = false;
-        }
+        await llamar({
+            accion: "insertar_reserva",
+            tabla_id: idActual,
+            cliente: document.getElementById("cliente").value,
+            minutos: document.getElementById("minutos").value,
+            monto: document.getElementById("monto").value,
+            comprobante: document.getElementById("ref").value
+        });
+        alert("✅ ¡Alquiler registrado con éxito!");
+        window.location.href = "SurfFlow.html";
     } catch (err) {
-        alert("❌ Error de conexión con el servidor.");
+        alert("❌ " + err.message);
         btn.disabled = false;
+        btn.textContent = "GUARDAR Y FINALIZAR";
     }
 });
+
+cargarTabla();
