@@ -23,6 +23,8 @@
         .timer.excedido { color: #c1121f; }
         .extender { display: flex; gap: 8px; margin-top: 10px; }
         .extender input { flex: 1; min-width: 0; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+        .cambiar-uso { margin-top: 18px; padding-top: 14px; border-top: 1px dashed #ccc; font-size: .9rem; }
+        .cambiar-uso select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -54,7 +56,7 @@
     function pintar() {
         const t = tabla;
         const alquilerActivo = t.estado === 'En Uso' && t.reserva_id;
-        let info = `<strong>${esc(t.nombre)}</strong><br>${esc(t.medida || '')} · ${esc(t.tipo || '')} · Uso: ${esc(t.uso)}<br>Estado: <strong>${esc(t.estado)}</strong>`;
+        let info = `<strong>${esc(t.nombre)}</strong><br>${esc(t.medida || '')} · ${esc(t.tipo || '')} · Uso: ${esc(textoUso(t.uso))}<br>Estado: <strong>${esc(t.estado)}</strong>`;
 
         if (alquilerActivo) {
             info += `<br>Cliente: ${esc(t.cliente)}<br>Pagó: ${fmtMin(t.minutos)}<div id="reloj" class="timer"></div>`;
@@ -68,10 +70,10 @@
             html += `<p style="font-size:.9rem">Esta tabla se libera sola al finalizar la clase en la sección Clases.</p>
                      <button class="btn-status btn-clase" onclick="location.href='clases.html'">Ir a Clases</button>`;
         } else {
-            if (t.uso === 'Alquiler' && t.estado === 'Disponible') {
+            if (t.uso !== 'Clases' && t.estado === 'Disponible') {
                 html += `<button class="btn-status btn-alquilar" onclick="location.href='reserva.html?id=${t.id}'">Alquilar 🟡</button>`;
             }
-            if (t.uso === 'Clases' && t.estado !== 'Mantenimiento') {
+            if (t.uso !== 'Alquiler' && t.estado !== 'Mantenimiento') {
                 html += `<button class="btn-status btn-clase" onclick="location.href='clases.html?tabla=${t.id}'">Programar clase 🎓</button>`;
             }
             if (alquilerActivo) {
@@ -88,6 +90,14 @@
                 html += `<button class="btn-status btn-mant" onclick="cambiarEstado('Mantenimiento')">Marcar: MANTENIMIENTO 🔴</button>`;
             }
         }
+        html += `<div class="cambiar-uso">
+                    <label for="sel-uso">Uso de esta tabla</label>
+                    <select id="sel-uso" onchange="cambiarUso(this.value)">
+                        <option value="Alquiler" ${t.uso === 'Alquiler' ? 'selected' : ''}>Solo alquiler</option>
+                        <option value="Clases" ${t.uso === 'Clases' ? 'selected' : ''}>Solo clases</option>
+                        <option value="Ambos" ${t.uso === 'Ambos' ? 'selected' : ''}>Alquiler y clases</option>
+                    </select>
+                 </div>`;
         document.getElementById('acciones').innerHTML = html;
 
         clearInterval(reloj_id);
@@ -107,6 +117,18 @@
         } else {
             el.textContent = `⚠️ Excedido +${reloj(-restante)}`;
             el.className = 'timer excedido';
+        }
+    }
+
+    function textoUso(uso) { return uso === 'Ambos' ? 'Alquiler + Clases' : uso; }
+
+    async function cambiarUso(uso) {
+        try {
+            await llamar({ accion: 'cambiar_uso', id: idTabla, uso });
+            await cargar();
+        } catch (e) {
+            alert('❌ ' + e.message);
+            cargar();
         }
     }
 

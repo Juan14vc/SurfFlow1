@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 TIPOS_CLASE = ("Individual", "Pareja", "Grupal")
-USOS_TABLA = ("Alquiler", "Clases")
+USOS_TABLA = ("Alquiler", "Clases", "Ambos")
 ESTADOS_TABLA = ("Disponible", "En Uso", "Mantenimiento")
 ESTADOS_CLASE = ("En curso", "Completada", "Cancelada")
 
@@ -269,6 +269,27 @@ def accion_actualizar_estado(cur, a):
     return {"status": "ok"}
 
 
+def accion_cambiar_uso(cur, a):
+    id_t = a_int(a.get("id"))
+    uso = a.get("uso")
+    if id_t is None or uso not in USOS_TABLA:
+        raise ErrorNegocio("Datos no válidos")
+    cur.execute("SELECT 1 FROM Tablas WHERE id = %s", (id_t,))
+    if not cur.fetchone():
+        raise ErrorNegocio("Tabla no encontrada")
+    if uso == "Alquiler":
+        cur.execute("""SELECT 1 FROM Clase_Tablas CT JOIN Clases C ON C.id = CT.clase_id
+                       WHERE CT.tabla_id = %s AND C.estado IN ('Programada', 'En curso') LIMIT 1""", (id_t,))
+        if cur.fetchone():
+            raise ErrorNegocio("La tabla tiene clases pendientes. Termínalas o cancélalas antes de quitarle el uso para clases")
+    if uso == "Clases":
+        cur.execute("SELECT 1 FROM Reservas WHERE tabla_id = %s AND finalizada = FALSE AND hora_fin IS NOT NULL LIMIT 1", (id_t,))
+        if cur.fetchone():
+            raise ErrorNegocio("La tabla tiene un alquiler activo. Libérala antes de quitarle el uso de alquiler")
+    cur.execute("UPDATE Tablas SET uso = %s WHERE id = %s", (uso, id_t))
+    return {"status": "ok"}
+
+
 # ---------------------------------------------------------------------------
 # ACCIONES: ALQUILERES
 # ---------------------------------------------------------------------------
@@ -288,13 +309,23 @@ def accion_insertar_reserva(cur, a):
     tabla = cur.fetchone()
     if not tabla:
         raise ErrorNegocio("Tabla no encontrada")
-    if tabla[1] != "Alquiler":
-        raise ErrorNegocio("Esta tabla es de uso para clases, no se alquila")
+    if tabla[1] == "Clases":
+        raise ErrorNegocio("Esta tabla es solo para clases, no se alquila")
     if tabla[0] == "Mantenimiento":
         raise ErrorNegocio("La tabla está en mantenimiento")
     cur.execute("SELECT 1 FROM Reservas WHERE tabla_id = %s AND finalizada = FALSE AND hora_fin IS NOT NULL", (t_id,))
     if cur.fetchone():
         raise ErrorNegocio("La tabla ya tiene un alquiler activo")
+    cur.execute("""SELECT 1 FROM Clases C JOIN Clase_Tablas CT ON CT.clase_id = C.id
+                   WHERE CT.tabla_id = %s
+                     AND (C.estado = 'En curso'
+                          OR (C.estado = 'Programada'
+                              AND C.fecha_hora < NOW() + make_interval(mins => %s)
+                              AND C.fecha_hora + make_interval(mins => C.duracion_min) > NOW()))
+                   LIMIT 1""", (t_id, minutos))
+    if cur.fetchone():
+        raise ErrorNegocio("Esta tabla está en una clase o tiene una clase programada que se cruza con ese "
+                           "tiempo de alquiler. Reduce el tiempo o reprograma la clase.")
 
     cur.execute("SELECT id FROM Usuarios WHERE usuario = 'natali_surf' LIMIT 1")
     fila_u = cur.fetchone()
@@ -489,9 +520,9 @@ def accion_crear_clase(cur, a):
     # Tablas e instructores
     if not tablas_ids:
         raise ErrorNegocio("Elige al menos una tabla")
-    cur.execute("SELECT COUNT(*) FROM Tablas WHERE id = ANY(%s) AND uso = 'Clases'", (tablas_ids,))
+    cur.execute("SELECT COUNT(*) FROM Tablas WHERE id = ANY(%s) AND uso IN ('Clases', 'Ambos')", (tablas_ids,))
     if cur.fetchone()[0] != len(tablas_ids):
-        raise ErrorNegocio("Solo puedes usar tablas marcadas para clases")
+        raise ErrorNegocio("Solo puedes usar tablas marcadas para clases (o para ambos usos)")
     if not instructores_ids:
         raise ErrorNegocio("Elige al menos un instructor")
     cur.execute("SELECT COUNT(*) FROM Instructores WHERE id = ANY(%s) AND activo", (instructores_ids,))
@@ -642,6 +673,7 @@ ACCIONES = {
     "obtener_tabla": accion_obtener_tabla,
     "agregar_tabla": accion_agregar_tabla,
     "actualizar_estado": accion_actualizar_estado,
+    "cambiar_uso": accion_cambiar_uso,
     "insertar_reserva": accion_insertar_reserva,
     "extender_reserva": accion_extender_reserva,
     "listar_instructores": accion_listar_instructores,

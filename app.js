@@ -12,14 +12,15 @@ function celdaTiempo(t) {
 
 function filaTabla(t) {
     const claseEstado = t.estado.toLowerCase().replace(/\s+/g, "-");
-    const claseUso = t.uso === "Clases" ? "uso-clases" : "uso-alquiler";
+    const claseUso = t.uso === "Clases" ? "uso-clases" : t.uso === "Ambos" ? "uso-ambos" : "uso-alquiler";
+    const textoUso = t.uso === "Ambos" ? "Alquiler + Clases" : t.uso;
     return `
         <tr>
             <td>${t.id}</td>
             <td>${esc(t.nombre)}</td>
             <td>${esc(t.medida || "N/A")}</td>
             <td>${esc(t.tipo || "N/A")}</td>
-            <td><span class="uso-badge ${claseUso}">${esc(t.uso)}</span></td>
+            <td><span class="uso-badge ${claseUso}">${esc(textoUso)}</span></td>
             <td><span class="status-badge ${claseEstado}">${esc(t.estado)}</span></td>
             <td>${celdaTiempo(t)}</td>
             <td><button class="btn-uso" onclick="gestionar(${t.id})">Gestionar</button></td>

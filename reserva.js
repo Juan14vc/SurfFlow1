@@ -24,7 +24,7 @@ async function cargarTabla() {
     try {
         const t = await llamar({ accion: "obtener_tabla", id: idActual });
         document.getElementById("nombre-tabla").textContent = `${t.nombre} (#${t.id})`;
-        if (t.uso !== "Alquiler") bloquear("Esta tabla es de uso para clases, no se alquila.");
+        if (t.uso === "Clases") bloquear("Esta tabla es solo para clases, no se alquila.");
         else if (t.estado === "Mantenimiento") bloquear("Esta tabla está en mantenimiento.");
         else if (t.estado === "En Uso" && t.reserva_id) bloquear("Esta tabla ya está alquilada.");
     } catch (e) {

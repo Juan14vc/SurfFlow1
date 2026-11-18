@@ -62,7 +62,7 @@
         <div id="participantes"></div>
         <button type="button" id="btn-add-part" class="btn-sec" onclick="agregarParticipante()" style="display:none;">+ Agregar alumno</button>
 
-        <h4>Tablas (solo las de uso "Clases")</h4>
+        <h4>Tablas (las de uso Clases o Alquiler y clases)</h4>
         <div id="lista-tablas-clase" class="checks"><span class="vacio">Cargando...</span></div>
 
         <h4>Instructores</h4>
@@ -146,10 +146,10 @@
     // ---------- Tablas e instructores ----------
     async function cargarTablasClase() {
         const data = await llamar({ accion: "listar" });
-        const tablas = data.filter(t => t.uso === "Clases");
+        const tablas = data.filter(t => t.uso !== "Alquiler");
         const cont = document.getElementById("lista-tablas-clase");
         if (!tablas.length) {
-            cont.innerHTML = '<span class="vacio">No hay tablas de uso "Clases". Agrégalas en el dashboard.</span>';
+            cont.innerHTML = '<span class="vacio">No hay tablas para clases. Agrégalas en el dashboard o cambia el uso de una existente.</span>';
             return;
         }
         cont.innerHTML = tablas.map(t => `
