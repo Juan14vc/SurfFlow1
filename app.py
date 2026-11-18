@@ -6,11 +6,15 @@ import os
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+
 def inicializar_sistema():
     """Sincroniza la estructura de la DB al arrancar"""
-    conn = get_connection()
-    cursor = conn.cursor()
+    conn = None
+    cursor = None
     try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
         # 1. Tabla Usuarios
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS Usuarios (
@@ -31,7 +35,7 @@ def inicializar_sistema():
                 estado VARCHAR(20) DEFAULT 'Disponible'
             );
         """)
-        # 3. Tabla Reservas (Fiel a tu diagrama de SQL Server)
+        # 3. Tabla Reservas
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS Reservas (
                 id SERIAL PRIMARY KEY,
@@ -51,26 +55,44 @@ def inicializar_sistema():
             ON CONFLICT (usuario) DO NOTHING;
         """)
         conn.commit()
+        print("Base de datos inicializada correctamente")
     except Exception as e:
         print(f"Error inicialización: {e}")
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 
 inicializar_sistema()
+
+
+@app.route('/')
+def inicio():
+    return jsonify({"status": "ok", "app": "SurfFlow API"})
+
 
 @app.route('/Servlet', methods=['GET'])
 def gateway():
     accion = request.args.get('accion')
-    conn = get_connection()
+
+    try:
+        conn = get_connection()
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"No hay conexión a la BD: {e}"}), 500
+
     cursor = conn.cursor()
-    
+
     try:
         # --- LOGIN ---
         if accion == 'login':
             user = request.args.get('user')
             pwd = request.args.get('pwd')
-            cursor.execute("SELECT id, nombre_completo FROM Usuarios WHERE usuario = %s AND password = %s", (user, pwd))
+            cursor.execute(
+                "SELECT id, nombre_completo FROM Usuarios WHERE usuario = %s AND password = %s",
+                (user, pwd)
+            )
             row = cursor.fetchone()
             if row:
                 return jsonify({"status": "success", "usuario": {"id": row[0], "nombre": row[1]}})
@@ -79,10 +101,25 @@ def gateway():
         # --- LISTAR TABLAS ---
         elif accion == 'listar':
             cursor.execute("SELECT id, nombre, medida, tipo, estado FROM Tablas ORDER BY id ASC")
-            tablas = [{"id": r[0], "nombre": r[1], "medida": r[2], "tipo": r[3], "estado": r[4]} for r in cursor.fetchall()]
+            tablas = [
+                {"id": r[0], "nombre": r[1], "medida": r[2], "tipo": r[3], "estado": r[4]}
+                for r in cursor.fetchall()
+            ]
             return jsonify(tablas)
 
-        # --- ACTUALIZAR ESTADO (PARA GESTIÓN INDIVIDUAL) ---
+        # --- AGREGAR TABLA ---
+        elif accion == 'agregar_tabla':
+            nombre = request.args.get('nombre')
+            medida = request.args.get('medida')
+            tipo = request.args.get('tipo')
+            cursor.execute(
+                "INSERT INTO Tablas (nombre, medida, tipo) VALUES (%s, %s, %s)",
+                (nombre, medida, tipo)
+            )
+            conn.commit()
+            return jsonify({"status": "success"})
+
+        # --- ACTUALIZAR ESTADO ---
         elif accion == 'actualizar_estado':
             id_t = request.args.get('id')
             est = request.args.get('estado')
@@ -90,43 +127,56 @@ def gateway():
             conn.commit()
             return jsonify({"status": "ok"})
 
-        # --- INSERTAR RESERVA (EL CORAZÓN DEL NEGOCIO) ---
+        # --- INSERTAR RESERVA ---
         elif accion == 'insertar_reserva':
             t_id = request.args.get('tabla_id')
             cli = request.args.get('cliente')
             mon = request.args.get('monto')
             ref = request.args.get('comprobante')
-            
-            # Buscamos el ID del usuario logueado (Natali)
+
             cursor.execute("SELECT id FROM Usuarios WHERE usuario = 'natali_surf' LIMIT 1")
             u_id = cursor.fetchone()[0]
 
-            # Inserción en la DB_SurfFlow
-            sql = """INSERT INTO Reservas (cliente_nombre, monto_pago, comprobante_img, confirmado, tabla_id, usuario_id) 
-                     VALUES (%s, %s, %s, True, %s, %s)"""
-            cursor.execute(sql, (cli, mon, ref, t_id, u_id))
-            
-            # Actualizamos la tabla a 'En Uso'
+            cursor.execute(
+                """INSERT INTO Reservas (cliente_nombre, monto_pago, comprobante_img, confirmado, tabla_id, usuario_id)
+                   VALUES (%s, %s, %s, True, %s, %s)""",
+                (cli, mon, ref, t_id, u_id)
+            )
             cursor.execute("UPDATE Tablas SET estado = 'En Uso' WHERE id = %s", (t_id,))
-            
             conn.commit()
             return jsonify({"status": "ok"})
 
         # --- REPORTE DE VENTAS ---
         elif accion == 'listar_movimientos':
-            sql = """SELECT R.fecha_reserva, T.nombre, R.cliente_nombre, R.comprobante_img, R.monto_pago
-                     FROM Reservas R 
-                     INNER JOIN Tablas T ON R.tabla_id = T.id 
-                     ORDER BY R.fecha_reserva DESC"""
-            cursor.execute(sql)
-            movs = [{"fecha": r[0].strftime("%d/%m %H:%M"), "tabla": r[1], "cliente": r[2], "ref": r[3], "monto": float(r[4])} for r in cursor.fetchall()]
+            cursor.execute(
+                """SELECT R.fecha_reserva, T.nombre, R.cliente_nombre, R.comprobante_img, R.monto_pago
+                   FROM Reservas R
+                   INNER JOIN Tablas T ON R.tabla_id = T.id
+                   ORDER BY R.fecha_reserva DESC"""
+            )
+            movs = [
+                {
+                    "fecha": r[0].strftime("%d/%m %H:%M"),
+                    "tabla": r[1],
+                    "cliente": r[2],
+                    "ref": r[3],
+                    "monto": float(r[4])
+                }
+                for r in cursor.fetchall()
+            ]
             return jsonify(movs)
 
+        # --- ACCIÓN DESCONOCIDA ---
+        else:
+            return jsonify({"status": "error", "message": "acción no válida"})
+
     except Exception as e:
+        conn.rollback()
         return jsonify({"status": "error", "message": str(e)})
     finally:
         cursor.close()
         conn.close()
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
